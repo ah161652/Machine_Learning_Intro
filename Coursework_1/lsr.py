@@ -1,156 +1,239 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Feb 17 11:50:31 2019
-
-@author: joshhamwee
-"""
-
 import sys
+import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
-from utilities import load_points_from_file
-
-#Function given by utilities file with error catchin
-def readFile(filename):
-    if(filename != None):
-        return load_points_from_file(filename)
-    else:
-        print("Please enter a file name")
 
 
-def showGraphs(xs,ys,xfinal,yfinal,n):
-    #Find out how many line segments and that there are equal amounts
-    assert len(xs) == len(ys)
-    assert len(xs) % 20 == 0
-    len_data = len(xs)
-    num_segments = len_data // 20
-    
-    #Change the colour for each segment
-    colour = np.concatenate([[i] * 20 for i in range(num_segments)])
-    
-    #Plot line graphs & scatter graphs for each segment
-    for n in range(n):
-        plt.plot(xfinal[0][n],yfinal[n][0],color = 'red')
-    plt.set_cmap('Dark2')
-    plt.scatter(xs, ys, c=colour)
+def load_points_from_file(filename):
+    points = pd.read_csv(filename, header=None)
+    return points[0].values, points[1].values
+
+
+def least_squares_linear(x, y):
+    xt = np.transpose(np.matrix(x))
+    n, m = xt.shape
+    x1 = np.ones((n, 1))
+
+    x_matrix = np.hstack((x1, xt))
+
+    y_matrix = np.matrix.transpose(np.matrix(y))
+
+    als = np.linalg.inv((np.matrix.transpose(x_matrix) * (x_matrix))) * (np.matrix.transpose(x_matrix)) * y_matrix
+    c = (als[0].item())
+    m1 = (als[1].item())
+    return c, m1
+
+
+def least_squares_3(x, y):
+    xt = np.transpose(np.matrix(x))
+    n, m = xt.shape
+    x1 = np.ones((n, 1))
+    x2 = np.square(xt)
+    x3 = np.power(xt, 3)
+
+    x_matrix = np.hstack((x1, xt, x2, x3))
+    y_matrix = np.matrix.transpose(np.matrix(y))
+
+    als = np.linalg.inv((np.matrix.transpose(x_matrix) * (x_matrix))) * (np.matrix.transpose(x_matrix)) * y_matrix
+    c = (als[0].item())
+    m1 = (als[1].item())
+    m2 = (als[2].item())
+    m3 = (als[3].item())
+    return c, m1, m2, m3
+
+
+def least_squares_sin(x,y):
+    xt = np.transpose(np.matrix(x))
+    n, m = xt.shape
+    x_sin = np.sin(xt)
+    x1 = np.ones((n, 1))
+
+    x_matrix = np.hstack((x1, x_sin))
+    y_matrix = np.matrix.transpose(np.matrix(y))
+
+    als = np.linalg.inv((np.matrix.transpose(x_matrix) * (x_matrix))) * (np.matrix.transpose(x_matrix)) * y_matrix
+    c = (als[0].item())
+    m1 = (als[1].item())
+    return c, m1
+
+
+def linear_error(x_points, y_points, c, m1):
+    i = 0
+    err = 0
+    while i < len(y_points):
+        y = y_points[i]
+        y_hat = c + (m1 * x_points[i])
+        error = (y_hat - y) ** 2
+        err = error + err
+        i = i + 1
+    return err
+
+
+def cubed_error(x_points, y_points, c, m1, m2, m3):
+    i = 0
+    err = 0
+    while i < len(y_points):
+        y = y_points[i]
+        y_hat = c + (m1 * x_points[i]) + (m2 * (x_points[i]**2)) + (m3 * (x_points[i]**3))
+        error = (y_hat - y) ** 2
+        err = error + err
+        i = i + 1
+    return err
+
+
+def sin_error(x_points, y_points, c, m1):
+    i = 0
+    err = 0
+    while i < len(y_points):
+        y = y_points[i]
+        y_hat = c + (m1 * np.sin(x_points[i]))
+        error = (y_hat - y) ** 2
+        err = error + err
+        i = i + 1
+    return err
+
+
+def sin_handler(segments_x, segments_y, num_segments, x):
+    intercepts = [None] * num_segments
+    gradients = [None] * num_segments
+
+    j = 0
+    while j < num_segments:
+        intercepts[j], gradients[j] = least_squares_sin(segments_x[j], segments_y[j])
+        j = j + 1
+
+    errors = [None] * num_segments
+
+    k = 0
+    while k < num_segments:
+        errors[k] = sin_error(segments_x[k], segments_y[k], intercepts[k], gradients[k])
+        k = k + 1
+
+    equations = [None] * num_segments
+    p = 0
+    while p < num_segments:
+        equations[p] = intercepts[p] + (gradients[p] * np.sin(x))
+        p = p + 1
+
+    return equations, errors
+
+
+def linear_handler(segments_x, segments_y, num_segments, x):
+    intercepts = [None] * num_segments
+    gradients = [None] * num_segments
+
+    j = 0
+    while j < num_segments:
+        intercepts[j], gradients[j] = least_squares_linear(segments_x[j], segments_y[j])
+        j = j + 1
+
+    errors = [None] * num_segments
+
+    k = 0
+    while k < num_segments:
+        errors[k] = linear_error(segments_x[k], segments_y[k], intercepts[k], gradients[k])
+        k = k + 1
+
+    equations_linear = [None] * num_segments
+    p = 0
+    while p < num_segments:
+        equations_linear[p] = intercepts[p] + (gradients[p] * x)
+        p = p + 1
+
+    return equations_linear, errors
+
+
+def cubed_handler(segments_x, segments_y, num_segments, x):
+    intercepts = [None] * num_segments
+    m1 = [None] * num_segments
+    m2 = [None] * num_segments
+    m3 = [None] * num_segments
+
+    t = 0
+    while t < num_segments:
+        intercepts[t], m1[t], m2[t], m3[t] = least_squares_3(segments_x[t], segments_y[t])
+        t = t + 1
+
+    errors = [None] * num_segments
+
+    k = 0
+    while k < num_segments:
+        errors[k] = cubed_error(segments_x[k], segments_y[k], intercepts[k], m1[k], m2[k], m3[k])
+        k = k + 1
+
+    equations = [None] * num_segments
+    p = 0
+    while p < num_segments:
+        equations[p] = intercepts[p] + (m1[p] * x) + (m2[p] * (x**2)) + (m3[p] * (x**3))
+        p = p + 1
+
+    return equations, errors
+
+
+data_x, data_y = load_points_from_file(sys.argv[1])
+
+assert len(data_x) == len(data_y)
+assert len(data_x) % 20 == 0
+len_data = len(data_x)
+num_segments = len_data // 20
+segments_x = [None] * num_segments
+segments_y = [None] * num_segments
+final_errors = [None] * num_segments
+colour = np.concatenate([[i] * 20 for i in range(num_segments)])
+plt.set_cmap('Dark2')
+plt.scatter(data_x, data_y, c=colour)
+x = np.linspace(min(data_x), max(data_x), 100)
+
+i = 0
+while i < num_segments:
+    segments_x[i] = data_x[i*20:(i*20)+20]
+    segments_y[i] = data_y[i * 20:(i * 20) + 20]
+    i = i + 1
+
+linear_equations, linear_errors = linear_handler(segments_x, segments_y, num_segments, x)
+cubed_equations, cubed_errors = cubed_handler(segments_x, segments_y, num_segments, x)
+sin_equations, sin_errors = sin_handler(segments_x, segments_y, num_segments, x)
+
+j = 0
+while j < num_segments:
+    if linear_errors[j] == min(linear_errors[j], cubed_errors[j], sin_errors[j]):
+        final_errors[j] = linear_errors[j]
+        plt.plot(x, linear_equations[j], '')
+        # print('linear')
+    elif cubed_errors[j] == min(linear_errors[j], cubed_errors[j], sin_errors[j]):
+        if linear_errors[j] - cubed_errors[j] < 0.20 * cubed_errors[j]:
+            final_errors[j] = linear_errors[j]
+            plt.plot(x, linear_equations[j], '')
+            # print('linear')
+        elif sin_errors[j] - cubed_errors[j] < 0.20 * cubed_errors[j]:
+            final_errors[j] = sin_errors[j]
+            plt.plot(x, sin_equations[j], '')
+            # print('sin')
+        else:
+            final_errors[j] = cubed_errors[j]
+            plt.plot(x, cubed_equations[j], '')
+            # print('cubed')
+
+    elif sin_errors[j] == min(linear_errors[j], cubed_errors[j], sin_errors[j]):
+        if linear_errors[j] - sin_errors[j] < 0.20 * sin_errors[j]:
+            final_errors[j] = linear_errors[j]
+            plt.plot(x, linear_equations[j], '')
+            # print('linear')
+        else:
+            final_errors[j] = sin_errors[j]
+            plt.plot(x, sin_equations[j], '')
+            # print('sin')
+    j = j + 1
+
+try:
+    plot_input = sys.argv[2]
+except IndexError:
+    plot_input = 'null'
+
+if plot_input == '--plot':
     plt.show()
-    
-def least_squares_linear(xi,yi):
-    #Initial variables
-    n = 1
-    xs = []
-    gen = (xi**i for i in range(n+1))
-    for val in gen:
-        xs.append(val)
-    
-    #Creating the two matrices
-    Y = np.matrix(yi)
-    X = np.matrix(xs)
-    
-    #Matrix multiplication to work out a & b values
-    X_transpose = X.transpose()
-    A = (np.matmul(X,X_transpose))
-    A = np.linalg.inv(A)
-    A = np.matmul(X_transpose,A)
-    A = np.matmul(Y,A)
-    
-    #Return final ybar value
-    ybar = np.matmul(A,X)
-    return np.array(ybar)
 
-
-def least_squares_poly(xi,yi):
-    #Initial variables
-    n = 3
-    xs = []
-    gen = (xi**i for i in range(n+1))
-    for val in gen:
-        xs.append(val)
-    
-    #Creating the two matrices
-    Y = np.matrix(yi)
-    X = np.matrix(xs)
-    
-    #Matrix multiplication to work out a & b values
-    X_transpose = X.transpose()
-    A = (np.matmul(X,X_transpose))
-    A = np.linalg.inv(A)
-    A = np.matmul(X_transpose,A)
-    A = np.matmul(Y,A)
-    
-    #Return final ybar value
-    ybar = np.matmul(A,X)
-    return np.array(ybar)
-
-
-def least_squares_unknown_sin(xi,yi):
-    #Coloumn for ones
-    ones = np.ones(len(xi))
-    
-    #Creating the two matrices
-    Y = np.matrix([yi])
-    X = np.matrix([ones,np.sin(xi)])
-    
-    #Matrix multiplication to work out a & b values
-    XT = X.transpose()
-    inversed = np.linalg.inv(np.matmul(X,XT))
-    A = np.matmul(Y,np.matmul(XT,inversed))
-    
-    #Return final ybar value
-    ybar = np.matmul(A,X)
-    return np.array(ybar)
-
-
-def sum_squared_error(ybar,yoriginal):
-    #Calculate the sum squared error on the ybar compared to the original y
-    total_error = np.sum((ybar-yoriginal)**2)
-    return total_error
-
-
-if __name__== "__main__":
-  xs, ys = readFile(sys.argv[1])
-  
-  #Find out how many line segments, then split into subarrary
-  numberLineSegs = int(len(xs)/20)
-  xsplit = np.split(xs,numberLineSegs)
-  ysplit = np.split(ys,numberLineSegs)
-  
-  #Initial variables
-  total_error = 0
-  yfinal = []
-  
-  #Iterate through all line segments
-  for i in range(len(xsplit)):
-      #Calculate ybars for all function types
-      ylinear = least_squares_linear(xsplit[i],ysplit[i])
-      ypoly = least_squares_poly(xsplit[i],ysplit[i])
-      yunknown = least_squares_unknown_sin(xsplit[i],ysplit[i])
-      
-      #Calculate error for all ybars
-      ylinearerror = sum_squared_error(ylinear,ysplit[i])
-      ypolyerror = sum_squared_error(ypoly,ysplit[i])
-      yunknownerror = sum_squared_error(yunknown,ysplit[i])
-      
-      #Return the smallest error and append the yvalues to the final y array
-      if(ylinearerror<ypolyerror and ylinearerror<yunknownerror):
-          yfinal.append(ylinear)
-      elif(ypolyerror<ylinearerror and ypolyerror<yunknownerror):
-          yfinal.append(ypoly)
-      else:
-          yfinal.append(yunknown)
-      total_error = total_error + min(ylinearerror,ypolyerror,yunknownerror)
-
-
-  #Print the final error to be read by the automarker
-  print(total_error)
-  
-  #Show the graph if --plot is specified in the sys.argv arguments
-  xfinal = []
-  xfinal.append(xsplit)
-  if(len(sys.argv)==3):
-      if(sys.argv[2] == '--plot'):
-          showGraphs(xs,ys,xfinal,yfinal,numberLineSegs)
+print(sum(final_errors))
   
           
   
