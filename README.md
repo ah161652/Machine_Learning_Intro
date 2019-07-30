@@ -4,7 +4,7 @@
 
 - Symbols Patterns and Signals over TB2
 - Josh Hamwee & Aidan Hood's Coursework Term 2.2
-- Josh Hamwee's Coursework for Term 2.1
+- Aidan Hood's Coursework for Term 2.1
 
 ### What is covered in the repository?
 
